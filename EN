@@ -1,0 +1,30 @@
+#!/bin/bash
+
+main_message_line1="-	OS1 - Duper - EN"
+main_message_line2="-	Simon Striekwold - 21237578 - H"
+main_message_line3="-	Yoran de Haan - 2124346 - H"
+
+#$ Duper Messages
+duper_duplicates="Duplicate files: "
+
+## Duper Usage
+duper_usage="duper [-r] [-x <file>] [-l <countrycode>] <start_folder>"
+duper_usage_x="-x <file>: Excludes file from search"
+duper_usage_l="-l <countrycode>: Set script language"
+duper_usage_r="-r: Remove found duplicates"
+
+## Duper Parse Options
+duper_invalid_file=": is not a file"
+duper_lang_invalid=": is not a supported language"
+duper_invalid="Invalid option: -$OPTARG"
+duper_invalid_parameter="Option -$OPTARG needs parameter"
+
+## Check if last argument is a file
+duper_invalid_folder="is not a folder"
+duper_non_accesible_folder="is not accesible"
+
+## Generate duplicates string, and remove files if selected
+duper_removed="Removed:"
+
+## Show found/removed duplicates
+duper_found_duplicates="Found duplicates:"

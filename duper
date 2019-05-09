@@ -1,0 +1,186 @@
+#!/bin/bash
+# Yoran de Haan - 2124346
+# Simon Striekwold - 2137578 
+# We hebben alles voor een 7 geïmplementeerd, geen extra's
+
+## Set default language to english
+source EN
+## Record start time
+startTime="$(date '+%Y-%m-%d %H:%M:%S:%N')"
+
+## Function to detect duplicates
+function find_duplicate() {
+	hashlist=()
+	set -f
+	IFS='
+	'
+	## Calculate hashes for all files in target folder
+	for f in $(find $1); do
+		hashlist+=( $(shasum $f 2> /dev/null | awk '{ print }') )
+	done
+
+	## Loop through all hashes
+	for i in "${!hashlist[@]}"; do 
+		name=$( echo "${hashlist[$i]}" | awk -F' ' '{first = $1; $1=""; print $0}' | sed 's/^ //g' )
+		hash=$( echo "${hashlist[$i]}" | awk -F' ' '{print $1}' )
+
+		## Check if this hash is excluded
+		isExcludedHash=false
+		for hashI in "${!excludedHashes[@]}"; do
+			if [[ "${excludedHashes[$hashI]}" == "${hash}" ]]; then
+				isExcludedHash=true
+				break
+			fi
+		done
+
+		## Find all files with hashes that occur more than once, exept the first occurrence. And add them to duplicates
+		if [ ! -d "$name" ] && [[ $isExcludedHash != true ]]; then
+			for j in "${!hashlist[@]}"; do 
+				tmphash=$( echo "${hashlist[$j]}" | awk -F' ' '{print $1}' )
+				if [ $hash == $tmphash ] && [ $j != $i ]; then
+					duplicates+=("${hashlist[$i]}")
+					break
+				fi
+			done
+		fi
+		
+	done
+}
+
+## Function to display propper usage, on error or help
+function usage()
+{
+	echo
+	echo "$duper_usage"
+	echo "$duper_usage_x"
+	echo "$duper_usage_l"
+	echo "$duper_usage_r"
+	exit 1
+}
+
+## Parse options
+excludedHashes=()
+while getopts :rx:l: opt; do
+	case $opt in
+
+		## Remove detected files
+		r) 
+			remove=true
+		;;
+
+		## Exclude file
+		x)
+			if [ -f "$(pwd)/$OPTARG" ]; then
+				excludedHashes+=( $(shasum "$(pwd)/$OPTARG" | awk '{ print $1 }') )
+			else
+				echo "$OPTARG$duper_invalid_file"
+				usage
+			fi
+		;;
+
+		## Choose Language
+		l)
+			if [[ "$OPTARG" == "EN" ]]; then
+               			source EN
+            		elif [[ "$OPTARG" == "NL" ]]; then
+                		source NL                
+           		else
+                		echo "$OPTARG$duper_lang_invalid"
+				usage
+            		fi
+		;;
+
+		\?)
+			echo
+			echo "$duper_invalid" >&2
+			usage
+		;;
+
+		:)
+			echo
+			echo "$duper_invalid_parameter" >&2
+			usage
+		;;
+	esac
+done
+
+## Authors
+echo "$main_message_line1" 
+echo "$main_message_line2" 
+echo "$main_message_line3"
+
+## Check if last argument is a file
+for last; do true; done
+if [ ! -d "$(pwd)/$last" ]; then
+	echo
+	echo "'$(pwd)/$last': $duper_invalid_folder"
+	usage
+elif [ ! -x "$last" ]; then
+	echo
+	echo "'$(pwd)/$last': $duper_non_accesible_folder"
+	usage
+fi
+
+## Find duplicates in target folder
+duplicates=()
+find_duplicate "$(pwd)/$last"
+
+## Sort duplicates by hash
+sortedDuplicates="$(printf '%s\n' "${duplicates[@]}" | sort -d -k 1)"
+
+## Generate duplicates string, and remove files if selected
+prevHash=""
+duplicatesString=""
+for sortedDuplicate in $sortedDuplicates; do
+	name=$( echo "${sortedDuplicate}" | awk -F' ' '{first = $1; $1=""; print $0}' | sed 's/^ //g' )
+	hash=$( echo "${sortedDuplicate}" | awk -F' ' '{print $1}' )
+
+	if [[ $prevHash == $hash ]]; then	
+		duplicatesString+="$(printf "    ")"
+	else
+		duplicatesString+="$(echo )
+"
+	fi
+
+	if [[ $remove == true && $prevHash == $hash ]]; then
+		rm "${name}"
+		duplicatesString+="$duper_removed ${name}
+"
+	else
+		duplicatesString+="${name}s
+"
+	fi
+	prevHash="${hash}"
+done
+
+## Show found/removed duplicates
+echo
+echo "$duper_found_duplicates"
+echo "$duplicatesString"
+
+
+## Log Activity
+
+## Command string
+IFS=' '
+activity+="duper $*"
+
+## Start- and end-time
+endTime="$(date '+%Y-%m-%d %H:%M:%S:%N')"
+activity+="
+$startTime - $endTime"
+
+## Found duplicates
+activity+="$duplicatesString"
+
+## Seperating newline
+activity+="
+-
+"
+
+## Save log file
+if [ ! -d "$HOME/var" ]; then
+	mkdir -p "$HOME/var" 2>/dev/null
+fi
+echo "${activity}" >> "$HOME/var/duper.log"
+
